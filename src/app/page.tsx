@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Header from '../components/Header';
 import StadiumMap from '../components/StadiumMap';
 import IncidentCommand from '../components/IncidentCommand';
@@ -17,15 +17,17 @@ export default function Home() {
   const [selectedGateId, setSelectedGateId] = useState<string | null>(null);
   const [systemMessage, setSystemMessage] = useState<string>('');
   const [activeScenario, setActiveScenario] = useState<string>('arrival');
-  const [weather, setWeather] = useState<{
+  interface WeatherData {
     tempF: number;
     description: string;
     precipitation: number;
     cloudCover: number;
-  } | null>(null);
+  }
+
+  const [weather, setWeather] = useState<WeatherData | null>(null);
 
   const stadiumStateRef = useRef<StadiumState>(stadiumState);
-  const weatherRef = useRef<any>(null);
+  const weatherRef = useRef<WeatherData | null>(null);
 
   useEffect(() => {
     stadiumStateRef.current = stadiumState;
@@ -202,8 +204,11 @@ export default function Home() {
   }, [triggerSystemMessage]);
 
 
-  // Filter out resolved incidents count
-  const activeIncidentCount = stadiumState.incidents.filter(i => i.status !== 'resolved').length;
+  // Memoize derived count to avoid recalculation on every render
+  const activeIncidentCount = useMemo(
+    () => stadiumState.incidents.filter(i => i.status !== 'resolved').length,
+    [stadiumState.incidents]
+  );
 
   return (
     <div style={appContainerStyle}>
@@ -226,9 +231,12 @@ export default function Home() {
           {Object.entries(SCENARIOS).map(([key, scenario]) => (
             <button
               key={key}
+              data-testid={`scenario-btn-${key}`}
               onClick={() => handleSwitchScenario(key)}
               style={activeScenario === key ? activeScenarioBtnStyle : scenarioBtnStyle}
               title={scenario.description}
+              aria-pressed={activeScenario === key}
+              aria-label={`Scenario: ${scenario.name} — ${scenario.description}`}
             >
               {scenario.name}
             </button>
@@ -390,17 +398,15 @@ const mainContentStyle: React.CSSProperties = {
   width: '100%',
 };
 
-const leftColStyle: React.CSSProperties = {
+// Shared column layout style (left and right columns are structurally identical)
+const colStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '24px',
 };
 
-const rightColStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '24px',
-};
+const leftColStyle = colStyle;
+const rightColStyle = colStyle;
 
 const infoBannerStyle: React.CSSProperties = {
   background: 'rgba(255,255,255,0.02)',

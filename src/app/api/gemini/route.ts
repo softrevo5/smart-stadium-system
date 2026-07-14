@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, Tool } from '@google/generative-ai';
 import { GateStatus, ConcessionStatus, Incident, StadiumState } from '@/lib/types';
 
 // System instructions per user role
@@ -85,7 +85,13 @@ export async function POST(req: NextRequest) {
     if (!genAI) {
       return NextResponse.json(
         { error: 'Gemini API Key is not configured', details: 'Please set the GEMINI_API_KEY environment variable in your .env configuration file.' },
-        { status: 401 }
+        {
+          status: 401,
+          headers: {
+            'Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff'
+          }
+        }
       );
     }
 
@@ -125,10 +131,11 @@ export async function POST(req: NextRequest) {
       // 1. Try enabling Google Search grounding to retrieve real-time tournament details, fixtures, transit schedules
       try {
         console.log(`Attempting generateContent with search grounding on ${modelName}...`);
+        const searchTools: Tool[] = [{ googleSearch: {} } as Tool];
         const model = genAI.getGenerativeModel({
           model: modelName,
           systemInstruction: SYSTEM_INSTRUCTIONS[role] || SYSTEM_INSTRUCTIONS.fan,
-          tools: [{ googleSearchRetrieval: {} }] as any
+          tools: searchTools
         });
 
         const result = await model.generateContent({
@@ -174,17 +181,29 @@ export async function POST(req: NextRequest) {
       throw apiError || new Error('All model attempts failed');
     }
 
-    return NextResponse.json({
-      content: responseText,
-      role: 'model'
-    });
+    return NextResponse.json(
+      { content: responseText, role: 'model' },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff'
+        }
+      }
+    );
 
   } catch (error: unknown) {
     console.error('Gemini API Error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       { error: 'Failed to process request', details: message },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff'
+        }
+      }
     );
   }
 }

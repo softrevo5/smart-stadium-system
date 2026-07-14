@@ -48,9 +48,9 @@ describe('Match Day Scenarios Simulation Engine', () => {
     // Check if the simulation region is present
     expect(screen.getByRole('region', { name: /simulation scenario control panel/i })).toBeInTheDocument();
     
-    // Verify each button is displayed
-    Object.values(SCENARIOS).forEach(scenario => {
-      expect(screen.getByRole('button', { name: scenario.name })).toBeInTheDocument();
+    // Verify each button is displayed — identified by data-testid
+    Object.keys(SCENARIOS).forEach(key => {
+      expect(screen.getByTestId(`scenario-btn-${key}`)).toBeInTheDocument();
     });
   });
 
@@ -58,7 +58,7 @@ describe('Match Day Scenarios Simulation Engine', () => {
     render(<Home />);
     
     // Switch to Mid-Match (Halftime Peak)
-    const duringButton = screen.getByRole('button', { name: SCENARIOS.during.name });
+    const duringButton = screen.getByTestId('scenario-btn-during');
     fireEvent.click(duringButton);
     
     // Verify that attendance capacity updates to halftime level
@@ -66,7 +66,7 @@ describe('Match Day Scenarios Simulation Engine', () => {
     expect(screen.getByText('82,420')).toBeInTheDocument();
     
     // Switch to Post-Match (Dispersal Peak)
-    const postButton = screen.getByRole('button', { name: SCENARIOS.post.name });
+    const postButton = screen.getByTestId('scenario-btn-post');
     fireEvent.click(postButton);
     
     // Post-Match current capacity is 32,100
@@ -76,7 +76,7 @@ describe('Match Day Scenarios Simulation Engine', () => {
   it('correctly configures evacuation state during Emergency Evacuation scenario', () => {
     render(<Home />);
     
-    const emergencyButton = screen.getByRole('button', { name: SCENARIOS.emergency.name });
+    const emergencyButton = screen.getByTestId('scenario-btn-emergency');
     fireEvent.click(emergencyButton);
     
     // Verify evacuation banner notification elements

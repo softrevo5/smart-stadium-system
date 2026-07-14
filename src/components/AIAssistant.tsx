@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { StadiumState } from '../lib/types';
 import { Send, MessageSquare, X, Sparkles, Volume2, VolumeX } from 'lucide-react';
 
@@ -77,7 +77,8 @@ export default function AIAssistant({ role, stadiumStateRef, systemMessage }: AI
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Quick Action Chips depending on active user role
-  const getQuickActions = () => {
+  // Memoize quick action chips per role so they are not recreated on every render
+  const quickActions = useMemo(() => {
     switch (role) {
       case 'fan':
         return [
@@ -108,20 +109,21 @@ export default function AIAssistant({ role, stadiumStateRef, systemMessage }: AI
       default:
         return [];
     }
-  };
+  }, [role]);
 
   const handleSpeech = (text: string) => {
     if (!speakEnabled || typeof window === 'undefined') return;
-    
-    // Clean markdown before speaking
-    const cleanText = text.replace(/[*#`_\-]/g, '');
-    
-    // Cancel existing speak
-    window.speechSynthesis?.cancel();
-    
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1.0;
-    window.speechSynthesis?.speak(utterance);
+    try {
+      // Clean markdown before speaking
+      const cleanText = text.replace(/[*#`_\-]/g, '');
+      // Cancel existing speak
+      window.speechSynthesis?.cancel();
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 1.0;
+      window.speechSynthesis?.speak(utterance);
+    } catch (err) {
+      console.warn('Speech synthesis unavailable:', err);
+    }
   };
 
   const handleGeminiQuery = async (queryText: string) => {
@@ -163,10 +165,10 @@ export default function AIAssistant({ role, stadiumStateRef, systemMessage }: AI
       }
     } catch (err: unknown) {
       console.error(err);
-      const errMsg = err instanceof Error ? err.message : 'API Offline';
+      const errMsg = err instanceof Error ? err.message : 'API connection error';
       setMessages(prev => [
         ...prev,
-        { id: `err-${Date.now()}`, role: 'model', content: `❌ **Error connecting to AI advisor:** ${errMsg}. Running in offline simulation mode.` }
+        { id: `err-${Date.now()}`, role: 'model', content: `❌ **Error connecting to AI advisor:** ${errMsg}. Please ensure your GEMINI_API_KEY is configured and try again.` }
       ]);
     } finally {
       setIsTyping(false);
@@ -374,7 +376,7 @@ export default function AIAssistant({ role, stadiumStateRef, systemMessage }: AI
 
           {/* Quick Action Chips */}
           <div style={chipsContainerStyle} aria-label="Suggested Prompts">
-            {getQuickActions().map((chip, idx) => (
+            {quickActions.map((chip, idx) => (
               <button 
                 key={idx}
                 onClick={() => handleGeminiQuery(chip.substring(2))} // Strip emoji prefix

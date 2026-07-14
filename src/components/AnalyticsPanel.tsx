@@ -1,17 +1,45 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StadiumState } from '../lib/types';
-import { BarChart3, Clock, Zap } from 'lucide-react';
+import { BarChart3, Clock, Zap, Trophy, Navigation } from 'lucide-react';
 
 interface AnalyticsProps {
   stadiumState: StadiumState;
 }
 
 const AnalyticsPanel = React.memo(function AnalyticsPanel({ stadiumState }: AnalyticsProps) {
-  // Sort gates for wait times chart
-  const gatesData = stadiumState.gates;
-  const concessionsData = stadiumState.concessions;
+  // Memoize data slices to avoid re-renders when parent state changes unrelated fields
+  const gatesData = useMemo(() => stadiumState.gates, [stadiumState.gates]);
+  const concessionsData = useMemo(() => stadiumState.concessions, [stadiumState.concessions]);
+
+  // Memoize the worst-gate info for dynamic aria-label
+  const worstGate = useMemo(
+    () => [...gatesData].sort((a, b) => b.estimatedWait - a.estimatedWait)[0],
+    [gatesData]
+  );
+  const worstConcession = useMemo(
+    () => [...concessionsData].sort((a, b) => b.estimatedWait - a.estimatedWait)[0],
+    [concessionsData]
+  );
+
+  // Crowd routing recommendation derived from live gate congestion
+  const crowdRecommendation = useMemo(() => {
+    const safestGate = [...gatesData].sort((a, b) => a.estimatedWait - b.estimatedWait)[0];
+    const highGates = gatesData.filter(g => g.congestion === 'high').map(g => g.name.split(' ')[1]);
+    if (highGates.length > 0) {
+      return {
+        priority: 'high' as const,
+        message: `⚠️ Redirect fans from Gate${highGates.length > 1 ? 's' : ''} ${highGates.join(', ')} to ${safestGate.name.split(' ')[1]} (${safestGate.estimatedWait}m wait). Open additional scanning lanes at congested entries.`,
+        action: `Dispatch 3 crowd stewards to ${highGates[0]}, activate overflow queue barriers.`
+      };
+    }
+    return {
+      priority: 'normal' as const,
+      message: `✅ Crowd flow balanced. ${safestGate.name.split(' ')[1]} has lowest wait at ${safestGate.estimatedWait}m. Maintain current staffing.`,
+      action: 'No immediate rerouting required.'
+    };
+  }, [gatesData]);
 
   return (
     <section className="glass-panel" style={panelStyle} aria-labelledby="analytics-title">
@@ -33,7 +61,7 @@ const AnalyticsPanel = React.memo(function AnalyticsPanel({ stadiumState }: Anal
               viewBox="0 0 300 150" 
               style={svgStyle}
               role="img"
-              aria-label="Bar chart showing gate wait times. Gate B has the highest wait time at 18 minutes."
+              aria-label={`Bar chart: Gate wait times. Highest: ${worstGate?.name} at ${worstGate?.estimatedWait} minutes (${worstGate?.congestion} congestion).`}
             >
               {/* Grid Lines */}
               <line x1="40" y1="20" x2="280" y2="20" stroke="rgba(255, 255, 255, 0.05)" />
@@ -127,7 +155,7 @@ const AnalyticsPanel = React.memo(function AnalyticsPanel({ stadiumState }: Anal
               viewBox="0 0 300 150" 
               style={svgStyle}
               role="img"
-              aria-label="Bar chart showing concession line queues. merchandize queue has the highest wait time at 22 minutes."
+              aria-label={`Bar chart: Concession wait times. Highest: ${worstConcession?.name} at ${worstConcession?.estimatedWait} minutes.`}
             >
               {/* Grid Lines */}
               <line x1="40" y1="20" x2="280" y2="20" stroke="rgba(255, 255, 255, 0.05)" />
@@ -190,6 +218,56 @@ const AnalyticsPanel = React.memo(function AnalyticsPanel({ stadiumState }: Anal
                 </linearGradient>
               </defs>
             </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* AI Crowd Routing Recommendation */}
+      <div
+        style={{
+          ...chartCardStyle,
+          borderColor: crowdRecommendation.priority === 'high' ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.4)',
+          background: crowdRecommendation.priority === 'high' ? 'rgba(239,68,68,0.05)' : 'rgba(16,185,129,0.04)'
+        }}
+        role="region"
+        aria-label="AI Crowd Routing Recommendation"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+          <Navigation size={16} color={crowdRecommendation.priority === 'high' ? 'var(--color-danger)' : 'var(--color-success)'} />
+          <strong style={{ fontSize: '0.85rem', color: crowdRecommendation.priority === 'high' ? 'var(--color-danger)' : 'var(--color-success)' }}>
+            🤖 AI Crowd Routing Advisory
+          </strong>
+        </div>
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '6px', lineHeight: 1.5 }}>
+          {crowdRecommendation.message}
+        </p>
+        <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+          Recommended action: {crowdRecommendation.action}
+        </p>
+      </div>
+
+      {/* Tournament Match Schedule */}
+      <div style={{ ...chartCardStyle, borderColor: 'rgba(0,240,255,0.2)' }} role="region" aria-label="Match Schedule">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+          <Trophy size={16} color="var(--color-primary)" />
+          <strong style={{ fontSize: '0.85rem', color: 'var(--color-primary)' }}>🏆 FIFA World Cup 2026 — Match Status</strong>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Current Venue Phase</p>
+            <p style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>{stadiumState.timeUntilMatch}</p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Attendance Filled</p>
+            <p style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-success)' }}>
+              {Math.round((stadiumState.currentCapacity / stadiumState.totalAttendance) * 100)}% capacity
+            </p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Active Incidents</p>
+            <p style={{ fontSize: '1rem', fontWeight: 700, color: stadiumState.incidents.filter(i => i.status !== 'resolved').length > 0 ? 'var(--color-warning)' : 'var(--color-success)' }}>
+              {stadiumState.incidents.filter(i => i.status !== 'resolved').length} open
+            </p>
           </div>
         </div>
       </div>

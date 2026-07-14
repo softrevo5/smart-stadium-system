@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { StadiumState } from '../lib/types';
 import { REAL_TRANSIT_OPTIONS } from '../lib/stadiumConfig';
 import { Leaf, Sparkles } from 'lucide-react';
@@ -15,12 +15,13 @@ const TransitSustainability = React.memo(function TransitSustainability({ stadiu
 
   const activeTransit = REAL_TRANSIT_OPTIONS.find(t => t.id === selectedTransit) || REAL_TRANSIT_OPTIONS[0];
 
-  // Calculate carbon offset based on distance
+  // Calculate carbon offset based on distance — memoized to prevent recalculation on unrelated renders
   // Baseline car emission: ~0.18 kg CO2 per km
   // Transit saving multiplier: e.g. Metro saves 80% compared to car
-  const calculateTotalSaved = () => {
-    return (distanceKm * activeTransit.carbonSavedKg / 10).toFixed(1);
-  };
+  const totalCarbonSaved = useMemo(
+    () => (distanceKm * activeTransit.carbonSavedKg / 10).toFixed(1),
+    [distanceKm, activeTransit.carbonSavedKg]
+  );
 
   return (
     <section className="glass-panel" style={panelStyle} aria-labelledby="eco-title">
@@ -62,6 +63,8 @@ const TransitSustainability = React.memo(function TransitSustainability({ stadiu
               value={distanceKm} 
               onChange={e => setDistanceKm(Number(e.target.value))}
               style={rangeStyle}
+              aria-valuetext={`${distanceKm} kilometers`}
+              aria-label="Distance to arena in kilometers"
             />
           </div>
 
@@ -87,7 +90,7 @@ const TransitSustainability = React.memo(function TransitSustainability({ stadiu
 
             <div style={offsetBoxStyle}>
               <Leaf size={16} color="var(--color-success)" />
-              <span>CO₂ Offset: <strong>{calculateTotalSaved()} kg CO₂</strong> saved vs. personal car</span>
+              <span>CO₂ Offset: <strong>{totalCarbonSaved} kg CO₂</strong> saved vs. personal car</span>
             </div>
           </div>
         </div>
