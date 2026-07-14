@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import AIAssistant from '../components/AIAssistant';
-import { INITIAL_STADIUM_STATE } from '../lib/mockData';
+import { INITIAL_STADIUM_STATE } from '../lib/stadiumConfig';
 
 // Mock window.speechSynthesis
 if (typeof window !== 'undefined') {
@@ -17,10 +17,11 @@ if (typeof window !== 'undefined') {
 
 describe('AIAssistant Component', () => {
   it('renders with appropriate fan greeting', async () => {
+    const mockRef = { current: INITIAL_STADIUM_STATE };
     render(
       <AIAssistant 
         role="fan" 
-        stadiumState={INITIAL_STADIUM_STATE} 
+        stadiumStateRef={mockRef} 
         systemMessage="" 
       />
     );
@@ -30,10 +31,11 @@ describe('AIAssistant Component', () => {
   });
 
   it('renders with appropriate organizer greeting and quick actions', async () => {
+    const mockRef = { current: INITIAL_STADIUM_STATE };
     render(
       <AIAssistant 
         role="organizer" 
-        stadiumState={INITIAL_STADIUM_STATE} 
+        stadiumStateRef={mockRef} 
         systemMessage="" 
       />
     );
@@ -43,10 +45,11 @@ describe('AIAssistant Component', () => {
   });
 
   it('supports toggling voice speech settings', () => {
+    const mockRef = { current: INITIAL_STADIUM_STATE };
     render(
       <AIAssistant 
         role="fan" 
-        stadiumState={INITIAL_STADIUM_STATE} 
+        stadiumStateRef={mockRef} 
         systemMessage="" 
       />
     );

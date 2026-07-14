@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { StadiumState } from '../lib/mockData';
+import { StadiumState } from '../lib/types';
 import { Send, MessageSquare, X, Sparkles, Volume2, VolumeX } from 'lucide-react';
 
 interface AIAssistantProps {
   role: string;
-  stadiumState: StadiumState;
+  stadiumStateRef: React.RefObject<StadiumState | null>;
   systemMessage: string;
 }
 
@@ -16,7 +16,58 @@ interface ChatMessage {
   content: string;
 }
 
-export default function AIAssistant({ role, stadiumState, systemMessage }: AIAssistantProps) {
+function parseBoldText(text: string): (string | React.JSX.Element)[] {
+  const boldRegex = /\*\*(.*?)\*\*/g;
+  const parts: (string | React.JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = boldRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+    parts.push(<strong key={`bold-${match.index}`} style={{ color: 'var(--color-primary)', fontWeight: 700 }}>{match[1]}</strong>);
+    lastIndex = boldRegex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  return parts;
+}
+
+function renderMarkdownText(text: string): (string | React.JSX.Element)[] {
+  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const parts: (string | React.JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = linkRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(...parseBoldText(text.substring(lastIndex, match.index)));
+    }
+    const linkText = match[1];
+    const linkUrl = match[2];
+    parts.push(
+      <a 
+        key={`link-${match.index}`} 
+        href={linkUrl} 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        style={{ color: 'var(--color-accent)', textDecoration: 'underline', fontWeight: 600 }}
+      >
+        {linkText}
+      </a>
+    );
+    lastIndex = linkRegex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push(...parseBoldText(text.substring(lastIndex)));
+  }
+
+  return parts.length > 0 ? parts : [text];
+}
+
+export default function AIAssistant({ role, stadiumStateRef, systemMessage }: AIAssistantProps) {
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputVal, setInputVal] = useState<string>('');
@@ -92,7 +143,7 @@ export default function AIAssistant({ role, stadiumState, systemMessage }: AIAss
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           role,
-          stadiumState,
+          stadiumState: stadiumStateRef.current,
           messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content }))
         })
       });
@@ -237,51 +288,69 @@ export default function AIAssistant({ role, stadiumState, systemMessage }: AIAss
                     {msg.role === 'user' ? 'YOU' : 'GEMINI COPILOT'}
                   </span>
                   
-                  {/* Bubble Content - basic custom markdown rendering */}
+                  {/* Bubble Content - advanced custom markdown rendering */}
                   <div style={bubbleContentStyle}>
                     {msg.content.split('\n').map((para, idx) => {
                       if (!para.trim()) return <div key={idx} style={{ height: '8px' }} />;
                       
                       let currentText = para;
                       let isBullet = false;
+                      let isNumber = false;
+                      let numPrefix = '';
                       let isHeader = false;
+                      let headerLevel = 4;
 
                       if (para.trim().startsWith('-') || para.trim().startsWith('*')) {
                         isBullet = true;
                         currentText = para.trim().replace(/^[\-\*]\s*/, '');
+                      } else if (/^\d+\.\s+/.test(para.trim())) {
+                        isNumber = true;
+                        const match = para.trim().match(/^(\d+)\.\s+/);
+                        numPrefix = match ? match[1] + '. ' : '';
+                        currentText = para.trim().replace(/^\d+\.\s+/, '');
                       } else if (para.trim().startsWith('###')) {
                         isHeader = true;
+                        headerLevel = 4;
                         currentText = para.trim().replace(/^###\s*/, '');
+                      } else if (para.trim().startsWith('##')) {
+                        isHeader = true;
+                        headerLevel = 3;
+                        currentText = para.trim().replace(/^##\s*/, '');
+                      } else if (para.trim().startsWith('#')) {
+                        isHeader = true;
+                        headerLevel = 2;
+                        currentText = para.trim().replace(/^#\s*/, '');
                       }
 
-                      // Replace bold markdown **text**
-                      const boldRegex = /\*\*(.*?)\*\*/g;
-                      const parts: (string | React.JSX.Element)[] = [];
-                      let lastIndex = 0;
-                      let match;
-                      
-                      while ((match = boldRegex.exec(currentText)) !== null) {
-                        if (match.index > lastIndex) {
-                          parts.push(currentText.substring(lastIndex, match.index));
-                        }
-                        parts.push(<strong key={match.index} style={{ color: 'var(--color-primary)' }}>{match[1]}</strong>);
-                        lastIndex = boldRegex.lastIndex;
-                      }
-                      if (lastIndex < currentText.length) {
-                        parts.push(currentText.substring(lastIndex));
-                      }
-                      
-                      const contentNode = parts.length > 0 ? parts : currentText;
+                      const parsedContent = renderMarkdownText(currentText);
 
                       if (isBullet) {
-                        return <li key={idx} style={{ marginLeft: '12px', listStyleType: 'square', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>{contentNode}</li>;
+                        return (
+                          <li key={idx} style={{ marginLeft: '16px', listStyleType: 'square', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                            {parsedContent}
+                          </li>
+                        );
+                      }
+
+                      if (isNumber) {
+                        return (
+                          <div key={idx} style={{ display: 'flex', gap: '6px', marginLeft: '12px', marginBottom: '4px', color: 'var(--color-text-secondary)' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{numPrefix}</span>
+                            <div>{parsedContent}</div>
+                          </div>
+                        );
                       }
 
                       if (isHeader) {
-                        return <h4 key={idx} style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#ffffff', marginTop: '8px', marginBottom: '4px' }}>{contentNode}</h4>;
+                        const size = headerLevel === 2 ? '1.1rem' : headerLevel === 3 ? '0.95rem' : '0.85rem';
+                        return (
+                          <h4 key={idx} style={{ fontSize: size, fontWeight: 'bold', color: '#ffffff', marginTop: '12px', marginBottom: '6px' }}>
+                            {parsedContent}
+                          </h4>
+                        );
                       }
 
-                      return <p key={idx} style={{ marginBottom: '6px' }}>{contentNode}</p>;
+                      return <p key={idx} style={{ marginBottom: '6px' }}>{parsedContent}</p>;
                     })}
                   </div>
                 </div>

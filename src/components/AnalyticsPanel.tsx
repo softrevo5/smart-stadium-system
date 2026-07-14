@@ -1,14 +1,14 @@
 'use client';
 
 import React from 'react';
-import { StadiumState } from '../lib/mockData';
+import { StadiumState } from '../lib/types';
 import { BarChart3, Clock, Zap } from 'lucide-react';
 
 interface AnalyticsProps {
   stadiumState: StadiumState;
 }
 
-export default function AnalyticsPanel({ stadiumState }: AnalyticsProps) {
+const AnalyticsPanel = React.memo(function AnalyticsPanel({ stadiumState }: AnalyticsProps) {
   // Sort gates for wait times chart
   const gatesData = stadiumState.gates;
   const concessionsData = stadiumState.concessions;
@@ -223,7 +223,7 @@ export default function AnalyticsPanel({ stadiumState }: AnalyticsProps) {
       </table>
     </section>
   );
-}
+});
 
 // styling definitions
 const panelStyle: React.CSSProperties = {
@@ -290,3 +290,5 @@ const srTableStyle: React.CSSProperties = {
   clip: 'rect(0, 0, 0, 0)',
   border: '0',
 };
+
+export default AnalyticsPanel;

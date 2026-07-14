@@ -9,9 +9,10 @@ interface HeaderProps {
   attendanceCount: number;
   maxAttendance: number;
   incidentCount: number;
+  weather?: { tempF: number; description: string } | null;
 }
 
-export default function Header({ role, setRole, attendanceCount, maxAttendance, incidentCount }: HeaderProps) {
+export default function Header({ role, setRole, attendanceCount, maxAttendance, incidentCount, weather }: HeaderProps) {
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setRole(e.target.value);
@@ -42,6 +43,12 @@ export default function Header({ role, setRole, attendanceCount, maxAttendance, 
           <ShieldCheck size={16} color="var(--color-success)" />
           <span>Status: <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>ONLINE</span></span>
         </div>
+        {weather && (
+          <div style={metricStyle} title="Real-Time Weather at MetLife Stadium (Open-Meteo API)">
+            <span style={{ filter: 'drop-shadow(0 0 4px var(--color-accent))' }}>☁️</span>
+            <span>Weather: <strong style={{ color: 'var(--color-accent)' }}>{weather.tempF}°F</strong> ({weather.description})</span>
+          </div>
+        )}
       </div>
 
       <div className="header-actions" style={actionsStyle}>

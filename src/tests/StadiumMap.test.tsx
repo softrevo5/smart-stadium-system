@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import StadiumMap from '../components/StadiumMap';
-import { GateStatus } from '../lib/mockData';
+import { GateStatus } from '../lib/types';
 
 const mockGates: GateStatus[] = [
   { id: 'gate-a', name: 'Gate A (North)', congestion: 'low', flowRate: 85, estimatedWait: 2, accessibleRamps: true },

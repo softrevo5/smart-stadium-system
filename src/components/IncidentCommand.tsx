@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Incident, StadiumState } from '../lib/mockData';
+import { Incident, StadiumState } from '../lib/types';
 import { Send, AlertTriangle, CheckCircle, RefreshCw, Cpu, Plus, HeartHandshake } from 'lucide-react';
 
 interface IncidentCommandProps {
@@ -10,7 +10,7 @@ interface IncidentCommandProps {
   onSendSystemMessage: (msg: string) => void;
 }
 
-export default function IncidentCommand({ stadiumState, onUpdateIncidents, onSendSystemMessage }: IncidentCommandProps) {
+const IncidentCommand = React.memo(function IncidentCommand({ stadiumState, onUpdateIncidents, onSendSystemMessage }: IncidentCommandProps) {
   const [loadingIncidentId, setLoadingIncidentId] = useState<string | null>(null);
   
   // Incident form state
@@ -276,7 +276,7 @@ export default function IncidentCommand({ stadiumState, onUpdateIncidents, onSen
       </div>
     </section>
   );
-}
+});
 
 // Styling objects
 const panelStyle: React.CSSProperties = {
@@ -500,3 +500,5 @@ const resolvedNoticeStyle: React.CSSProperties = {
   padding: '6px 0',
   fontWeight: 600,
 };
+
+export default IncidentCommand;

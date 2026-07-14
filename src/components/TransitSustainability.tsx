@@ -1,18 +1,19 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MOCK_TRANSIT_OPTIONS, StadiumState } from '../lib/mockData';
+import { StadiumState } from '../lib/types';
+import { REAL_TRANSIT_OPTIONS } from '../lib/stadiumConfig';
 import { Leaf, Sparkles } from 'lucide-react';
 
 interface TransitProps {
   stadiumState: StadiumState;
 }
 
-export default function TransitSustainability({ stadiumState }: TransitProps) {
+const TransitSustainability = React.memo(function TransitSustainability({ stadiumState }: TransitProps) {
   const [selectedTransit, setSelectedTransit] = useState<string>('metro');
   const [distanceKm, setDistanceKm] = useState<number>(15);
 
-  const activeTransit = MOCK_TRANSIT_OPTIONS.find(t => t.id === selectedTransit) || MOCK_TRANSIT_OPTIONS[0];
+  const activeTransit = REAL_TRANSIT_OPTIONS.find(t => t.id === selectedTransit) || REAL_TRANSIT_OPTIONS[0];
 
   // Calculate carbon offset based on distance
   // Baseline car emission: ~0.18 kg CO2 per km
@@ -41,7 +42,7 @@ export default function TransitSustainability({ stadiumState }: TransitProps) {
               onChange={e => setSelectedTransit(e.target.value)}
               style={selectStyle}
             >
-              {MOCK_TRANSIT_OPTIONS.map(opt => (
+              {REAL_TRANSIT_OPTIONS.map(opt => (
                 <option key={opt.id} value={opt.id}>
                   {opt.name} ({opt.ecoRating} Option)
                 </option>
@@ -137,7 +138,7 @@ export default function TransitSustainability({ stadiumState }: TransitProps) {
       </div>
     </section>
   );
-}
+});
 
 // Styling definitions
 const panelStyle: React.CSSProperties = {
@@ -323,3 +324,5 @@ const greenFoodStyle: React.CSSProperties = {
   padding: '12px',
   marginTop: '8px',
 };
+
+export default TransitSustainability;

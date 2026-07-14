@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { GateStatus, ConcessionStatus, Incident, StadiumState } from '@/lib/mockData';
+import { GateStatus, ConcessionStatus, Incident, StadiumState } from '@/lib/types';
 
 // System instructions per user role
 const SYSTEM_INSTRUCTIONS: Record<string, string> = {
@@ -83,13 +83,10 @@ export async function POST(req: NextRequest) {
 
     // Verify API client initialization
     if (!genAI) {
-      // Return a simulated high-quality response if no API key is provided
-      const userMessage = messages[messages.length - 1]?.content || 'Hello';
-      const mockReply = getDemoModeResponse(role, userMessage, stadiumState);
-      return NextResponse.json({
-        content: `> **[DEMO MODE]** *Google Gemini API Key is not configured. Running local fallback system.* \n\n${mockReply}`,
-        role: 'model'
-      });
+      return NextResponse.json(
+        { error: 'Gemini API Key is not configured', details: 'Please set the GEMINI_API_KEY environment variable in your .env configuration file.' },
+        { status: 401 }
+      );
     }
 
     // Format chat history for Gemini API
@@ -125,10 +122,13 @@ export async function POST(req: NextRequest) {
     ];
 
     for (const modelName of modelsToTry) {
+      // 1. Try enabling Google Search grounding to retrieve real-time tournament details, fixtures, transit schedules
       try {
+        console.log(`Attempting generateContent with search grounding on ${modelName}...`);
         const model = genAI.getGenerativeModel({
           model: modelName,
-          systemInstruction: SYSTEM_INSTRUCTIONS[role] || SYSTEM_INSTRUCTIONS.fan
+          systemInstruction: SYSTEM_INSTRUCTIONS[role] || SYSTEM_INSTRUCTIONS.fan,
+          tools: [{ googleSearchRetrieval: {} }] as any
         });
 
         const result = await model.generateContent({
@@ -142,9 +142,31 @@ export async function POST(req: NextRequest) {
         responseText = result.response.text();
         success = true;
         break; // Successfully generated content, exit loop
-      } catch (err) {
-        console.warn(`Gemini model ${modelName} invocation failed:`, err);
-        apiError = err;
+      } catch (groundingErr) {
+        console.warn(`Search grounding failed or not supported in this API key tier, falling back to standard generation:`, groundingErr);
+        
+        // 2. Fall back to standard generation without external search tools
+        try {
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            systemInstruction: SYSTEM_INSTRUCTIONS[role] || SYSTEM_INSTRUCTIONS.fan
+          });
+
+          const result = await model.generateContent({
+            contents,
+            generationConfig: {
+              maxOutputTokens: 800,
+              temperature: 0.2,
+            }
+          });
+
+          responseText = result.response.text();
+          success = true;
+          break; // Successfully generated content, exit loop
+        } catch (err) {
+          apiError = err;
+          console.error(`Error with model ${modelName} in standard generation fallback:`, err);
+        }
       }
     }
 
@@ -160,64 +182,9 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     console.error('Gemini API Error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
-
-    try {
-      const userMessage = messages[messages.length - 1]?.content || 'Hello';
-      const mockReply = getDemoModeResponse(role, userMessage, stadiumState);
-      return NextResponse.json({
-        content: `> **[API FALLBACK ACTIVE]** *The GenAI gateway encountered an error: "${message}". Falling back to local offline responder.* \n\n${mockReply}`,
-        role: 'model'
-      });
-    } catch {
-      return NextResponse.json(
-        { error: 'Failed to process request', details: message },
-        { status: 500 }
-      );
-    }
+    return NextResponse.json(
+      { error: 'Failed to process request', details: message },
+      { status: 500 }
+    );
   }
-}
-
-// local rules/fallback responses for demo mode
-function getDemoModeResponse(role: string, prompt: string, state: StadiumState | null): string {
-  const p = prompt.toLowerCase();
-
-  if (role === 'fan') {
-    if (p.includes('gate') || p.includes('entrance') || p.includes('line') || p.includes('queue')) {
-      const gateB = state?.gates.find((g: GateStatus) => g.id === 'gate-b');
-      const gateA = state?.gates.find((g: GateStatus) => g.id === 'gate-a');
-      const gateD = state?.gates.find((g: GateStatus) => g.id === 'gate-d');
-      return `Based on live counts, **${gateB?.name || 'Gate B'}** is experiencing heavy traffic (**${gateB?.estimatedWait || 18} mins** wait time) due to the Light Rail connection. \n\n**Recommendation:** \n- Walk around to **${gateA?.name || 'Gate A'}** or **${gateD?.name || 'Gate D'}** where wait times are under **2 minutes**.\n- *Accessibility note:* Gate A and D both have full ADA ramps and elevators. Avoid Gate C as it contains stairs only.`;
-    }
-    if (p.includes('food') || p.includes('eat') || p.includes('merch') || p.includes('water')) {
-      return `Here are the active concessions near you:\n1. **Eco-Hydration Station 1** (Wait: ~1m) - Bring your reusable bottle for **Free Filtered Water**. Save plastic!\n2. **Azteca Tacos & Empanadas** (Wait: ~12m) - Try the **Plant-based Chorizo Tacos** (certified carbon-neutral).\n3. **FIFA official Merchandise Hub** (Wait: ~22m) - Grab an official jersey made of **upcycled ocean plastics**.`;
-    }
-    if (p.includes('transit') || p.includes('metro') || p.includes('bus') || p.includes('park') || p.includes('shuttle')) {
-      return `For green transit to and from the stadium today, you should choose:\n- **Metro Line 6**: 18-minute travel time, saving **4.2kg of CO2**. Operates directly outside Gate B.\n- **FIFA Green Electric Shuttle**: 22-minute travel time, saving **3.8kg of CO2**. Completely **Free** with match ticket.\n\n*Rideshare has a 35+ min delay due to security perimeter locks. We strongly advise using the Metro or Shuttle.*`;
-    }
-    return `Welcome to the FIFA World Cup 2026 Smart Stadium! I can help you with:\n- **Wayfinding & Gates** (Avoid long wait lines)\n- **Accessibility Routes** (Ramps/elevators location)\n- **Concessions & Eco-Eats** (Find water refills & plant-based food)\n- **Green Transportation** (Metro & Electric shuttles schedule)\n\nWhat can I assist you with?`;
-  }
-
-  if (role === 'organizer') {
-    if (p.includes('incident') || p.includes('cardiac') || p.includes('scanner') || p.includes('spill') || p.includes('medical')) {
-      return `### 🚨 OPERATIONS DISPATCH PROTOCOL: INCIDENT ANALYSIS
-      
-1. **Critical Incident (Section 218 - Medical AED Dispatch)**
-   - **Protocol:** Dispatching First Aid Responder Team C (Location: Zone 2 Concourse). 
-   - **Actions:** Local supervisor notified. AED unit en route. Ambient camera check indicates paramedics arrived. Response time: 2m 14s.
-   
-2. **Medium Priority (Gate B Scanner Failure)**
-   - **Protocol:** IT Network Support dispatched.
-   - **Actions:** Redirect incoming ticketing queues from turnstiles 4/5 to Gate A. Broadcasted notification to stewards.
-   
-3. **Low Priority (Section 104 spill)**
-   - **Protocol:** Facilities/Janitorial dispatch.
-   - **Actions:** Cleaning ticket #922 opened. Wet floor sign deployed. Safe transit perimeter set.`;
-    }
-    return `### 🏟️ GenAI Command Center Support Active
-- **Active Attendance:** ${state?.currentCapacity || '48,920'} / ${state?.totalAttendance || '68,500'}
-- **Power Grid:** Solar panels generating ${state?.solarPowerOutput || '420'} kW (Grid self-sufficiency at 34%)
-- **System Diagnostics:** All gates operating. Incident queue contains **${state?.incidents.length || 0} active tickets**.\n\n*Ask me to analyze active incidents, draft team assignments, or run event status reports.*`;
-  }
-
-  return `Hello! Running in Demo Mode as **${role.toUpperCase()}**. Please configure the \`GEMINI_API_KEY\` environment variable for full Generative AI features.`;
 }

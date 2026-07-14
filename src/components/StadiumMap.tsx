@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { GateStatus } from '../lib/mockData';
+import React, { useState, useMemo } from 'react';
+import { GateStatus } from '../lib/types';
 import { Info, Eye, EyeOff, ShieldAlert } from 'lucide-react';
 
 interface StadiumMapProps {
@@ -10,7 +10,7 @@ interface StadiumMapProps {
   selectedGateId: string | null;
 }
 
-export default function StadiumMap({ gates, onSelectGate, selectedGateId }: StadiumMapProps) {
+const StadiumMap = React.memo(function StadiumMap({ gates, onSelectGate, selectedGateId }: StadiumMapProps) {
   const [accessMode, setAccessMode] = useState<boolean>(false);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
 
@@ -27,6 +27,142 @@ export default function StadiumMap({ gates, onSelectGate, selectedGateId }: Stad
   const handleSectionClick = (sectionName: string) => {
     setSelectedSection(sectionName);
   };
+
+  // Memoize static map geometries to prevent re-evaluating complex SVG nodes on 10s state ticks
+  const staticMapLayout = useMemo(() => {
+    return (
+      <>
+        {/* Stadium outer aura */}
+        <ellipse cx="250" cy="200" rx="220" ry="170" fill="url(#stadiumGlow)" />
+
+        {/* Outer Security Boundary */}
+        <ellipse
+          cx="250"
+          cy="200"
+          rx="200"
+          ry="150"
+          fill="none"
+          stroke="rgba(255, 255, 255, 0.08)"
+          strokeWidth="2"
+          strokeDasharray="4 8"
+        />
+
+        {/* Stadium Structure (Main Outer Wall) */}
+        <ellipse
+          cx="250"
+          cy="200"
+          rx="160"
+          ry="120"
+          fill="rgba(10, 15, 30, 0.8)"
+          stroke="rgba(255, 255, 255, 0.2)"
+          strokeWidth="3"
+        />
+
+        {/* Pitches / Field Area */}
+        <rect
+          x="210"
+          y="170"
+          width="80"
+          height="60"
+          rx="4"
+          fill="rgba(16, 185, 129, 0.15)"
+          stroke="rgba(16, 185, 129, 0.5)"
+          strokeWidth="1.5"
+        />
+        {/* Goal posts/lines */}
+        <line x1="210" y1="200" x2="290" y2="200" stroke="rgba(16, 185, 129, 0.2)" />
+        <circle cx="250" cy="200" r="15" fill="none" stroke="rgba(16, 185, 129, 0.3)" />
+
+        {/* Seating Sections with Accessibility Keyboard Outlines & Labels */}
+        {/* Section 101 - North */}
+        <path
+          d="M 200 110 A 100 70 0 0 1 300 110 L 280 140 A 60 40 0 0 0 220 140 Z"
+          fill={selectedSection === '101' ? 'rgba(0, 240, 255, 0.25)' : 'rgba(255, 255, 255, 0.03)'}
+          stroke={selectedSection === '101' ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.15)'}
+          strokeWidth="1.5"
+          cursor="pointer"
+          onClick={() => handleSectionClick('101')}
+          tabIndex={0}
+          role="button"
+          aria-label={`Stadium Seating Section 101. ${selectedSection === '101' ? 'Selected.' : 'Click to route.'}`}
+          onKeyDown={(e) => e.key === 'Enter' && handleSectionClick('101')}
+          style={{ outline: 'none' }}
+        />
+        <text x="250" y="125" fill={selectedSection === '101' ? '#ffffff' : 'var(--color-text-secondary)'} fontSize="10" textAnchor="middle" fontWeight="bold" pointerEvents="none">Sec 101</text>
+
+        {/* Section 102 - East */}
+        <path
+          d="M 370 160 A 130 90 0 0 1 370 240 L 330 225 A 90 60 0 0 0 330 175 Z"
+          fill={selectedSection === '102' ? 'rgba(0, 240, 255, 0.25)' : 'rgba(255, 255, 255, 0.03)'}
+          stroke={selectedSection === '102' ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.15)'}
+          strokeWidth="1.5"
+          cursor="pointer"
+          onClick={() => handleSectionClick('102')}
+          tabIndex={0}
+          role="button"
+          aria-label={`Stadium Seating Section 102. ${selectedSection === '102' ? 'Selected.' : 'Click to route.'}`}
+          onKeyDown={(e) => e.key === 'Enter' && handleSectionClick('102')}
+          style={{ outline: 'none' }}
+        />
+        <text x="350" y="204" fill={selectedSection === '102' ? '#ffffff' : 'var(--color-text-secondary)'} fontSize="10" textAnchor="middle" fontWeight="bold" pointerEvents="none">Sec 102</text>
+
+        {/* Section 103 - South */}
+        <path
+          d="M 300 290 A 100 70 0 0 1 200 290 L 220 260 A 60 40 0 0 0 280 260 Z"
+          fill={selectedSection === '103' ? 'rgba(0, 240, 255, 0.25)' : 'rgba(255, 255, 255, 0.03)'}
+          stroke={selectedSection === '103' ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.15)'}
+          strokeWidth="1.5"
+          cursor="pointer"
+          onClick={() => handleSectionClick('103')}
+          tabIndex={0}
+          role="button"
+          aria-label={`Stadium Seating Section 103. ${selectedSection === '103' ? 'Selected.' : 'Click to route.'}`}
+          onKeyDown={(e) => e.key === 'Enter' && handleSectionClick('103')}
+          style={{ outline: 'none' }}
+        />
+        <text x="250" y="280" fill={selectedSection === '103' ? '#ffffff' : 'var(--color-text-secondary)'} fontSize="10" textAnchor="middle" fontWeight="bold" pointerEvents="none">Sec 103</text>
+
+        {/* Section 104 - West */}
+        <path
+          d="M 130 240 A 130 90 0 0 1 130 160 L 170 175 A 90 60 0 0 0 170 225 Z"
+          fill={selectedSection === '104' ? 'rgba(0, 240, 255, 0.25)' : 'rgba(255, 255, 255, 0.03)'}
+          stroke={selectedSection === '104' ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.15)'}
+          strokeWidth="1.5"
+          cursor="pointer"
+          onClick={() => handleSectionClick('104')}
+          tabIndex={0}
+          role="button"
+          aria-label={`Stadium Seating Section 104. ${selectedSection === '104' ? 'Selected.' : 'Click to route.'}`}
+          onKeyDown={(e) => e.key === 'Enter' && handleSectionClick('104')}
+          style={{ outline: 'none' }}
+        />
+        <text x="150" y="204" fill={selectedSection === '104' ? '#ffffff' : 'var(--color-text-secondary)'} fontSize="10" textAnchor="middle" fontWeight="bold" pointerEvents="none">Sec 104</text>
+
+        {/* Dynamic Wayfinding Line (if gate and section are chosen) */}
+        {selectedGateId && selectedSection && (
+          <path
+            d={
+              selectedGateId === 'gate-a' && selectedSection === '101' ? 'M 250 50 Q 250 80 250 110' :
+              selectedGateId === 'gate-a' && selectedSection === '102' ? 'M 250 50 C 310 50 350 120 350 170' :
+              selectedGateId === 'gate-b' && selectedSection === '102' ? 'M 440 200 Q 380 200 350 200' :
+              selectedGateId === 'gate-b' && selectedSection === '103' ? 'M 440 200 C 440 270 330 280 270 280' :
+              selectedGateId === 'gate-c' && selectedSection === '103' ? 'M 250 350 Q 250 310 250 285' :
+              selectedGateId === 'gate-d' && selectedSection === '104' ? 'M 60 200 Q 110 200 140 200' :
+              // Fallback direct spline
+              `M ${selectedGateId === 'gate-a' ? '250 50' : selectedGateId === 'gate-b' ? '440 200' : selectedGateId === 'gate-c' ? '250 350' : '60 200'} L ${selectedSection === '101' ? '250 125' : selectedSection === '102' ? '350 204' : selectedSection === '103' ? '250 280' : '150 204'}`
+            }
+            fill="none"
+            stroke="url(#wayfindingLine)"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray="6 4"
+            className="wayfinding-glow"
+            style={{ filter: 'drop-shadow(0px 0px 5px rgba(0,240,255,0.7))' }}
+          />
+        )}
+      </>
+    );
+  }, [selectedSection, selectedGateId]);
 
   return (
     <section className="glass-panel" style={containerStyle} aria-labelledby="map-title">
@@ -64,114 +200,8 @@ export default function StadiumMap({ gates, onSelectGate, selectedGateId }: Stad
             </linearGradient>
           </defs>
 
-          {/* Stadium outer aura */}
-          <ellipse cx="250" cy="200" rx="220" ry="170" fill="url(#stadiumGlow)" />
-
-          {/* Outer Security Boundary */}
-          <ellipse
-            cx="250"
-            cy="200"
-            rx="200"
-            ry="150"
-            fill="none"
-            stroke="rgba(255, 255, 255, 0.08)"
-            strokeWidth="2"
-            strokeDasharray="4 8"
-          />
-
-          {/* Stadium Structure (Main Outer Wall) */}
-          <ellipse
-            cx="250"
-            cy="200"
-            rx="160"
-            ry="120"
-            fill="rgba(10, 15, 30, 0.8)"
-            stroke="rgba(255, 255, 255, 0.2)"
-            strokeWidth="3"
-          />
-
-          {/* Pitches / Field Area */}
-          <rect
-            x="210"
-            y="170"
-            width="80"
-            height="60"
-            rx="4"
-            fill="rgba(16, 185, 129, 0.15)"
-            stroke="rgba(16, 185, 129, 0.5)"
-            strokeWidth="1.5"
-          />
-          {/* Goal posts/lines */}
-          <line x1="210" y1="200" x2="290" y2="200" stroke="rgba(16, 185, 129, 0.2)" />
-          <circle cx="250" cy="200" r="15" fill="none" stroke="rgba(16, 185, 129, 0.3)" />
-
-          {/* Seating Sections */}
-          {/* Section 101 - North */}
-          <path
-            d="M 200 110 A 100 70 0 0 1 300 110 L 280 140 A 60 40 0 0 0 220 140 Z"
-            fill={selectedSection === '101' ? 'rgba(0, 240, 255, 0.25)' : 'rgba(255, 255, 255, 0.03)'}
-            stroke={selectedSection === '101' ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.15)'}
-            strokeWidth="1.5"
-            cursor="pointer"
-            onClick={() => handleSectionClick('101')}
-          />
-          <text x="250" y="125" fill={selectedSection === '101' ? '#ffffff' : 'var(--color-text-secondary)'} fontSize="10" textAnchor="middle" fontWeight="bold">Sec 101</text>
-
-          {/* Section 102 - East */}
-          <path
-            d="M 370 160 A 130 90 0 0 1 370 240 L 330 225 A 90 60 0 0 0 330 175 Z"
-            fill={selectedSection === '102' ? 'rgba(0, 240, 255, 0.25)' : 'rgba(255, 255, 255, 0.03)'}
-            stroke={selectedSection === '102' ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.15)'}
-            strokeWidth="1.5"
-            cursor="pointer"
-            onClick={() => handleSectionClick('102')}
-          />
-          <text x="350" y="204" fill={selectedSection === '102' ? '#ffffff' : 'var(--color-text-secondary)'} fontSize="10" textAnchor="middle" fontWeight="bold">Sec 102</text>
-
-          {/* Section 103 - South */}
-          <path
-            d="M 300 290 A 100 70 0 0 1 200 290 L 220 260 A 60 40 0 0 0 280 260 Z"
-            fill={selectedSection === '103' ? 'rgba(0, 240, 255, 0.25)' : 'rgba(255, 255, 255, 0.03)'}
-            stroke={selectedSection === '103' ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.15)'}
-            strokeWidth="1.5"
-            cursor="pointer"
-            onClick={() => handleSectionClick('103')}
-          />
-          <text x="250" y="280" fill={selectedSection === '103' ? '#ffffff' : 'var(--color-text-secondary)'} fontSize="10" textAnchor="middle" fontWeight="bold">Sec 103</text>
-
-          {/* Section 104 - West */}
-          <path
-            d="M 130 240 A 130 90 0 0 1 130 160 L 170 175 A 90 60 0 0 0 170 225 Z"
-            fill={selectedSection === '104' ? 'rgba(0, 240, 255, 0.25)' : 'rgba(255, 255, 255, 0.03)'}
-            stroke={selectedSection === '104' ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.15)'}
-            strokeWidth="1.5"
-            cursor="pointer"
-            onClick={() => handleSectionClick('104')}
-          />
-          <text x="150" y="204" fill={selectedSection === '104' ? '#ffffff' : 'var(--color-text-secondary)'} fontSize="10" textAnchor="middle" fontWeight="bold">Sec 104</text>
-
-          {/* Dynamic Wayfinding Line (if gate and section are chosen) */}
-          {selectedGateId && selectedSection && (
-            <path
-              d={
-                selectedGateId === 'gate-a' && selectedSection === '101' ? 'M 250 50 Q 250 80 250 110' :
-                selectedGateId === 'gate-a' && selectedSection === '102' ? 'M 250 50 C 310 50 350 120 350 170' :
-                selectedGateId === 'gate-b' && selectedSection === '102' ? 'M 440 200 Q 380 200 350 200' :
-                selectedGateId === 'gate-b' && selectedSection === '103' ? 'M 440 200 C 440 270 330 280 270 280' :
-                selectedGateId === 'gate-c' && selectedSection === '103' ? 'M 250 350 Q 250 310 250 285' :
-                selectedGateId === 'gate-d' && selectedSection === '104' ? 'M 60 200 Q 110 200 140 200' :
-                // Fallback direct spline
-                `M ${selectedGateId === 'gate-a' ? '250 50' : selectedGateId === 'gate-b' ? '440 200' : selectedGateId === 'gate-c' ? '250 350' : '60 200'} L ${selectedSection === '101' ? '250 125' : selectedSection === '102' ? '350 204' : selectedSection === '103' ? '250 280' : '150 204'}`
-              }
-              fill="none"
-              stroke="url(#wayfindingLine)"
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeDasharray="6 4"
-              className="wayfinding-glow"
-              style={{ filter: 'drop-shadow(0px 0px 5px rgba(0,240,255,0.7))' }}
-            />
-          )}
+          {/* Render static elements from useMemo */}
+          {staticMapLayout}
 
           {/* GATE INDICATORS */}
           {/* Gate A (North) */}
@@ -332,7 +362,7 @@ export default function StadiumMap({ gates, onSelectGate, selectedGateId }: Stad
       </div>
     </section>
   );
-}
+});
 
 // styling objects
 const containerStyle: React.CSSProperties = {
@@ -501,3 +531,5 @@ const clearSecBtnStyle: React.CSSProperties = {
   padding: 0,
   textDecoration: 'underline',
 };
+
+export default StadiumMap;

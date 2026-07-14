@@ -1,20 +1,105 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '../components/Header';
 import StadiumMap from '../components/StadiumMap';
 import IncidentCommand from '../components/IncidentCommand';
 import TransitSustainability from '../components/TransitSustainability';
 import AnalyticsPanel from '../components/AnalyticsPanel';
 import AIAssistant from '../components/AIAssistant';
-import { INITIAL_STADIUM_STATE, StadiumState, Incident, GateStatus } from '../lib/mockData';
+import { StadiumState, Incident, GateStatus } from '../lib/types';
+import { INITIAL_STADIUM_STATE, SCENARIOS } from '../lib/stadiumConfig';
 import { Shield, Sparkles, Info } from 'lucide-react';
 
 export default function Home() {
   const [role, setRole] = useState<string>('fan');
-  const [stadiumState, setStadiumState] = useState<StadiumState>(INITIAL_STADIUM_STATE);
+  const [stadiumState, setStadiumState] = useState<StadiumState>(SCENARIOS.arrival.state);
   const [selectedGateId, setSelectedGateId] = useState<string | null>(null);
   const [systemMessage, setSystemMessage] = useState<string>('');
+  const [activeScenario, setActiveScenario] = useState<string>('arrival');
+  const [weather, setWeather] = useState<{
+    tempF: number;
+    description: string;
+    precipitation: number;
+    cloudCover: number;
+  } | null>(null);
+
+  const stadiumStateRef = useRef<StadiumState>(stadiumState);
+  const weatherRef = useRef<any>(null);
+
+  useEffect(() => {
+    stadiumStateRef.current = stadiumState;
+  }, [stadiumState]);
+
+  useEffect(() => {
+    weatherRef.current = weather;
+  }, [weather]);
+
+  // Fetch real-time weather data for MetLife Stadium (East Rutherford, NJ)
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchWeather() {
+      try {
+        const res = await fetch(
+          'https://api.open-meteo.com/v1/forecast?latitude=40.8128&longitude=-74.0743&current=temperature_2m,precipitation,weather_code,cloud_cover'
+        );
+        const data = await res.json();
+        if (data && data.current && isMounted) {
+          const tempC = data.current.temperature_2m;
+          const tempF = Math.round((tempC * 9) / 5 + 32);
+          const precip = data.current.precipitation || 0;
+          const cloud = data.current.cloud_cover || 0;
+          const code = data.current.weather_code || 0;
+
+          let desc = 'Clear Sky';
+          if (code >= 1 && code <= 3) desc = 'Partly Cloudy';
+          else if (code === 45 || code === 48) desc = 'Foggy';
+          else if (code >= 51 && code <= 55) desc = 'Light Drizzle';
+          else if (code >= 61 && code <= 65) desc = 'Rainy';
+          else if (code >= 71 && code <= 77) desc = 'Snowy';
+          else if (code >= 80 && code <= 82) desc = 'Rain Showers';
+          else if (code >= 95) desc = 'Thunderstorms';
+
+          const weatherData = {
+            tempF,
+            description: desc,
+            precipitation: precip,
+            cloudCover: cloud
+          };
+          setWeather(weatherData);
+
+          // Drive initial stadium state metrics using the live weather!
+          setStadiumState(prev => {
+            const baseSolar = 520;
+            const newSolar = Math.round(baseSolar * ((100 - cloud) / 100));
+            const hasRain = precip > 0;
+            const updatedGates = prev.gates.map(gate => {
+              if (hasRain) {
+                return {
+                  ...gate,
+                  estimatedWait: gate.estimatedWait + 3,
+                  notes: gate.notes ? `${gate.notes}. ⚠️ Rain delays active.` : '⚠️ Rain delays active.'
+                };
+              }
+              return gate;
+            });
+
+            return {
+              ...prev,
+              solarPowerOutput: newSolar,
+              gates: updatedGates
+            };
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch real MetLife weather data:', err);
+      }
+    }
+    fetchWeather();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Live simulation ticks (run every 10 seconds)
   useEffect(() => {
@@ -49,10 +134,19 @@ export default function Home() {
           };
         });
 
-        // Increment green stats
+        // Increment green stats dynamically using real weather data references
+        const currentCloudCover = weatherRef.current ? weatherRef.current.cloudCover : 15;
+        const currentPrecip = weatherRef.current ? weatherRef.current.precipitation : 0;
+        
         const solarChange = Math.floor(Math.random() * 11) - 5; // -5 to +5 kW fluctuation
-        const newSolar = Math.max(380, prev.solarPowerOutput + solarChange);
-        const newWater = prev.waterSaved + Math.floor(Math.random() * 8) + 2; // +2 to 9 gallons saved
+        const baseSolar = Math.round(520 * ((100 - currentCloudCover) / 100));
+        const newSolar = Math.max(10, Math.min(650, baseSolar + solarChange));
+        
+        // Boost water saved from rainwater harvesting if raining
+        const waterChange = currentPrecip > 0 
+          ? (Math.floor(Math.random() * 50) + 30) 
+          : (Math.floor(Math.random() * 8) + 2);
+        const newWater = prev.waterSaved + waterChange;
 
         return {
           ...prev,
@@ -67,22 +161,46 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSelectGate = (gate: GateStatus) => {
+  const handleSelectGate = useCallback((gate: GateStatus) => {
     setSelectedGateId(gate.id);
-  };
+  }, []);
 
-  const handleUpdateIncidents = (updatedIncidents: Incident[]) => {
+  const handleUpdateIncidents = useCallback((updatedIncidents: Incident[]) => {
     setStadiumState(prev => ({
       ...prev,
       incidents: updatedIncidents
     }));
-  };
+  }, []);
 
-  const triggerSystemMessage = (msg: string) => {
+  const triggerSystemMessage = useCallback((msg: string) => {
     setSystemMessage(msg);
     // Clear system message shortly after so it can be re-triggered
     setTimeout(() => setSystemMessage(''), 1000);
-  };
+  }, []);
+
+  const handleSwitchScenario = useCallback((scenarioKey: string) => {
+    setActiveScenario(scenarioKey);
+    const selected = SCENARIOS[scenarioKey];
+    if (selected) {
+      let state = { ...selected.state };
+      if (weatherRef.current) {
+        // Overlay live weather variables onto scenario selection
+        const cloud = weatherRef.current.cloudCover;
+        const precip = weatherRef.current.precipitation;
+        state.solarPowerOutput = Math.round(520 * ((100 - cloud) / 100));
+        if (precip > 0) {
+          state.gates = state.gates.map(gate => ({
+            ...gate,
+            estimatedWait: gate.estimatedWait + 3,
+            notes: gate.notes ? `${gate.notes}. ⚠️ Rain delays active.` : '⚠️ Rain delays active.'
+          }));
+        }
+      }
+      setStadiumState(state);
+      triggerSystemMessage(`Switched stadium mode to: ${selected.name}.`);
+    }
+  }, [triggerSystemMessage]);
+
 
   // Filter out resolved incidents count
   const activeIncidentCount = stadiumState.incidents.filter(i => i.status !== 'resolved').length;
@@ -95,7 +213,28 @@ export default function Home() {
         attendanceCount={stadiumState.currentCapacity}
         maxAttendance={stadiumState.totalAttendance}
         incidentCount={activeIncidentCount}
+        weather={weather}
       />
+
+      {/* Match Day Scenario Simulation Controller */}
+      <div style={scenarioBarStyle} className="glass-panel" role="region" aria-label="Simulation Scenario Control Panel">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-primary)' }}>
+          <Sparkles size={16} />
+          <span style={{ fontSize: '0.85rem', fontWeight: 800, letterSpacing: '0.05em' }}>TOURNAMENT MATCH SIMULATOR:</span>
+        </div>
+        <div style={scenarioButtonsContainerStyle}>
+          {Object.entries(SCENARIOS).map(([key, scenario]) => (
+            <button
+              key={key}
+              onClick={() => handleSwitchScenario(key)}
+              style={activeScenario === key ? activeScenarioBtnStyle : scenarioBtnStyle}
+              title={scenario.description}
+            >
+              {scenario.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <main style={mainContentStyle} className="dashboard-grid">
         {/* LEFT COLUMN: Map and analytics depending on role */}
@@ -106,13 +245,20 @@ export default function Home() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Shield size={16} color="var(--color-primary)" />
               <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>
-                {role === 'fan' ? (
+                {stadiumState.timeUntilMatch.includes('EVACUATION') ? (
+                  <span style={{ color: 'var(--color-danger)' }}>⚠️ EMERGENCY EVACUATION ACTIVE: Directing all fans to nearest exit paths!</span>
+                ) : role === 'fan' ? (
                   '🏟️ Spectator Guide: Reusable plastic bottles (<750ml) permitted. Use hydration stations!'
                 ) : (
                   `🛡️ Operations Desk: Shift active. Dispatch is synced with local emergency services.`
                 )}
               </span>
             </div>
+            {weather && (
+              <div style={weatherWidgetStyle} title="Live weather at MetLife Stadium (East Rutherford, NJ)">
+                <span>📍 MetLife weather: <strong>{weather.tempF}°F</strong> ({weather.description})</span>
+              </div>
+            )}
             <span style={liveIndicatorStyle}>
               <span className="ping-indicator" style={{ color: 'var(--color-accent)' }} />
               <span>LIVE SIMULATOR</span>
@@ -184,7 +330,7 @@ export default function Home() {
       {/* Floating Chat Copilot */}
       <AIAssistant
         role={role}
-        stadiumState={stadiumState}
+        stadiumStateRef={stadiumStateRef}
         systemMessage={systemMessage}
       />
     </div>
@@ -198,6 +344,45 @@ const appContainerStyle: React.CSSProperties = {
   minHeight: '100vh',
   width: '100%',
   position: 'relative',
+};
+
+const scenarioBarStyle: React.CSSProperties = {
+  margin: '16px auto 0 auto',
+  width: 'calc(100% - 48px)',
+  maxWidth: 'var(--container-max)',
+  padding: '12px 24px',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: '16px',
+  borderRadius: '12px',
+};
+
+const scenarioButtonsContainerStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: '10px',
+  flexWrap: 'wrap',
+};
+
+const scenarioBtnStyle: React.CSSProperties = {
+  background: 'rgba(255, 255, 255, 0.03)',
+  border: '1px solid var(--border-subtle)',
+  color: 'var(--color-text-secondary)',
+  padding: '6px 14px',
+  borderRadius: '20px',
+  fontSize: '0.8rem',
+  fontWeight: 600,
+  cursor: 'pointer',
+  transition: 'all 0.2s ease',
+};
+
+const activeScenarioBtnStyle: React.CSSProperties = {
+  ...scenarioBtnStyle,
+  background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(112, 0, 255, 0.15))',
+  border: '1px solid rgba(0, 240, 255, 0.4)',
+  color: 'var(--color-primary)',
+  boxShadow: '0 0 10px rgba(0, 240, 255, 0.1)',
 };
 
 const mainContentStyle: React.CSSProperties = {
@@ -278,3 +463,17 @@ const tipStyle: React.CSSProperties = {
   border: '1px solid rgba(0, 240, 255, 0.1)',
   marginTop: '12px',
 };
+
+const weatherWidgetStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  background: 'rgba(255, 255, 255, 0.05)',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  borderRadius: '6px',
+  padding: '3px 8px',
+  fontSize: '0.75rem',
+  color: 'var(--color-success)',
+  fontWeight: 600,
+};
+

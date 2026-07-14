@@ -60,7 +60,7 @@ To demonstrate real-world usability, the application runs a local tick simulator
 
 ### 2. Security
 * **Safe Keys:** The Gemini API key is loaded server-side only via environment variables (`process.env.GEMINI_API_KEY`). It is never exposed to the client.
-* **Offline Demo Mode:** If no API key is provided, the application runs on a pre-grounded local rules engine rather than crashing, ensuring safe runtime stability.
+* **Strict Key Validation:** To comply with the zero-fake-response directive, if no API key is provided, the route handler returns a `401 Unauthorized` configuration warning, directing the team to set the key.
 
 ### 3. Efficiency
 * Light and optimized SVGs for the interactive map instead of resource-heavy images.
@@ -68,7 +68,7 @@ To demonstrate real-world usability, the application runs a local tick simulator
 * Fast page load speeds complying with Vercel deployment standards.
 
 ### 4. Testing
-* Unit and integration testing verify the correctness of mock states, SVG map interactions, and the Gemini API fallback responses.
+* Unit and integration testing verify the correctness of dynamic weather updates, SVG map interactions, and the Gemini API key missing status responses.
 * Test suite configured using Node 22 native globals polyfilled for JSDOM.
 
 ### 5. Accessibility (A11y)
@@ -80,7 +80,7 @@ To demonstrate real-world usability, the application runs a local tick simulator
 ---
 
 ## 📋 Assumptions Made
-1. **API Keys:** It is assumed the user has a Google Gemini API Key configured in their `.env` or Vercel environment as `GEMINI_API_KEY`. If absent, the app falls back gracefully to a simulation response.
+1. **API Keys:** The user has a Google Gemini API Key configured in their `.env` or Vercel environment as `GEMINI_API_KEY` for generative operations.
 2. **Device Support:** Works on standard web browsers. Responsive CSS media queries are used to adjust the layout between desktop monitors and mobile devices.
 
 ---
